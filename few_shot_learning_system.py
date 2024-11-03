@@ -9,6 +9,7 @@ import torch.optim as optim
 from meta_neural_network_architectures import VGGReLUNormNetwork
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
+from logger_utils import setup_logger, trace_calls
 
 def set_torch_seed(seed):
     """
@@ -24,6 +25,7 @@ def set_torch_seed(seed):
 
 
 class MAMLFewShotClassifier(nn.Module):
+    @trace_calls
     def __init__(self, im_shape, device, args):
         """
         Initializes a MAML few shot learning system
@@ -119,6 +121,7 @@ class MAMLFewShotClassifier(nn.Module):
             )
         }
 
+    @trace_calls
     def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
@@ -167,6 +170,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses
 
+    @trace_calls
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
@@ -262,6 +266,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
+    @trace_calls
     def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
@@ -293,6 +298,7 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 yield param
 
+    @trace_calls
     def train_forward_prop(self, data_batch, epoch):
         """
         Runs an outer loop forward prop using the meta-model and base-model.
@@ -322,6 +328,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
+    @trace_calls
     def meta_update(self, loss):
         """
         Applies an outer loop update on the meta-parameters of the model.
@@ -335,6 +342,7 @@ class MAMLFewShotClassifier(nn.Module):
                     param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
         self.optimizer.step()
 
+    @trace_calls
     def run_train_iter(self, data_batch, epoch):
         """
         Runs an outer loop update step on the meta-model's parameters.
@@ -343,7 +351,8 @@ class MAMLFewShotClassifier(nn.Module):
         :return: The losses of the ran iteration.
         """
         epoch = int(epoch)
-        self.scheduler.step(epoch=epoch)
+        if epoch > 1:
+            self.scheduler.step(epoch=epoch)
         if self.current_epoch != epoch:
             self.current_epoch = epoch
 
@@ -359,10 +368,13 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
+        logger.debug("Starting train_forward_prop")
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
+        logger.debug("Starting meta_update")
+
         self.meta_update(loss=losses['loss'])
-        losses['learning_rate'] = self.scheduler.get_lr()[0]
+        losses['learning_rate'] = self.scheduler.get_last_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()
 

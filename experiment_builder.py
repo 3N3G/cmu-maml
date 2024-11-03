@@ -5,9 +5,10 @@ import sys
 from utils.storage import build_experiment_folder, save_statistics, save_to_json
 import time
 import torch
-
+from logger_utils import setup_logger, trace_calls
 
 class ExperimentBuilder(object):
+    @trace_calls
     def __init__(self, args, data, model, device):
         """
         Initializes an experiment builder using a named tuple (args), a data provider (data), a meta learning system
@@ -61,7 +62,7 @@ class ExperimentBuilder(object):
         self.start_time = time.time()
         self.epochs_done_in_this_run = 0
         print(self.state['current_iter'], int(self.args.total_iter_per_epoch * self.args.total_epochs))
-
+    @trace_calls
     def build_summary_dict(self, total_losses, phase, summary_losses=None):
         """
         Builds/Updates a summary dict directly from the metric dict of the current iteration.
@@ -78,7 +79,8 @@ class ExperimentBuilder(object):
             summary_losses["{}_{}_std".format(phase, key)] = np.std(total_losses[key])
 
         return summary_losses
-
+    
+    @trace_calls
     def build_loss_summary_string(self, summary_losses):
         """
         Builds a progress bar summary string given current summary losses dictionary
@@ -92,13 +94,15 @@ class ExperimentBuilder(object):
                 output_update += "{}: {:.4f}, ".format(key, value)
 
         return output_update
-
+    
+    @trace_calls
     def merge_two_dicts(self, first_dict, second_dict):
         """Given two dicts, merge them into a new dict as a shallow copy."""
         z = first_dict.copy()
         z.update(second_dict)
         return z
-
+    
+    @trace_calls
     def train_iteration(self, train_sample, sample_idx, epoch_idx, total_losses, current_iter, pbar_train):
         """
         Runs a training iteration, updates the progress bar and returns the total and current epoch train losses.
@@ -116,6 +120,9 @@ class ExperimentBuilder(object):
         if sample_idx == 0:
             print("shape of data", x_support_set.shape, x_target_set.shape, y_support_set.shape,
                   y_target_set.shape)
+
+        
+        setup_logger.debug(f"Starting model.run_train_iter for epoch {epoch_idx}, iter {current_iter}")
 
         losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx)
 
@@ -135,6 +142,7 @@ class ExperimentBuilder(object):
 
         return train_losses, total_losses, current_iter
 
+    @trace_calls
     def evaluation_iteration(self, val_sample, total_losses, pbar_val, phase):
         """
         Runs a validation iteration, updates the progress bar and returns the total and current epoch val losses.
@@ -162,7 +170,8 @@ class ExperimentBuilder(object):
             "val_phase {} -> {}".format(self.epoch, val_output_update))
 
         return val_losses, total_losses
-
+    
+    @trace_calls
     def test_evaluation_iteration(self, val_sample, model_idx, sample_idx, per_model_per_batch_preds, pbar_test):
         """
         Runs a validation iteration, updates the progress bar and returns the total and current epoch val losses.
@@ -186,7 +195,8 @@ class ExperimentBuilder(object):
             "test_phase {} -> {}".format(self.epoch, test_output_update))
 
         return per_model_per_batch_preds
-
+    
+    @trace_calls
     def save_models(self, model, epoch, state):
         """
         Saves two separate instances of the current model. One to be kept for history and reloading later and another
@@ -205,6 +215,7 @@ class ExperimentBuilder(object):
 
         print("saved models to", self.saved_models_filepath)
 
+    @trace_calls
     def pack_and_save_metrics(self, start_time, create_summary_csv, train_losses, val_losses, state):
         """
         Given current epochs start_time, train losses, val losses and whether to create a new stats csv file, pack stats
@@ -244,6 +255,7 @@ class ExperimentBuilder(object):
                                                            list(epoch_summary_losses.values()))
         return start_time, state
 
+    @trace_calls
     def evaluated_test_set_using_the_best_models(self, top_n_models):
         per_epoch_statistics = self.state['per_epoch_statistics']
         val_acc = np.copy(per_epoch_statistics['val_accuracy_mean'])
@@ -299,6 +311,7 @@ class ExperimentBuilder(object):
         print(test_losses)
         print("saved test performance at", summary_statistics_filepath)
 
+    @trace_calls
     def run_experiment(self):
         """
         Runs a full training experiment with evaluations of the model on the val set at every epoch. Furthermore,
