@@ -1,3 +1,6 @@
+# Most of this repository contains code written by Antoniou et. al. for their paper How to train your MAML. It includes minor quality-of-life changes to the codebase, as well as two Jupyter notebooks we used to run experiments for our improvements on the Omniglot and Imagenet datasets.
+
+
 # How to train your MAML in Pytorch
 A replication of the paper ["How to train your MAML"](https://arxiv.org/abs/1810.09502), along with a replication of the original ["Model Agnostic Meta Learning"](https://arxiv.org/abs/1703.03400) (MAML) paper.
 
